@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: TU_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-frontend:latest
+    image: 058264429007.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-frontend:latest
     container_name: tienda-tech-frontend
     ports:
       - "80:80"
@@ -8,7 +8,7 @@ services:
       - backend
 
   backend:
-    image: TU_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-backend:latest
+    image: 058264429007.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-backend:latest
     container_name: tienda-tech-backend
     environment:
       DB_HOST: "${DB_HOST}"
