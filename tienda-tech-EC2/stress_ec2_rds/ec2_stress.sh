@@ -7,7 +7,7 @@ set -Eeuo pipefail
 # ---------------------------
 # USER CONFIG (override via env vars)
 # ---------------------------
-URL="${URL:-http://127.0.0.1/}"
+URL="${URL:-http://localhost/}"
 
 # Log naming (change this to rename output log)
 LOG_PREFIX="${LOG_PREFIX:-ec2_stress_v14}"
@@ -544,7 +544,7 @@ fi
 
 if [[ "$HTTP_MONITOR_ENABLED" -eq 1 && "$http_fail" != "N/A" ]]; then
   if [[ "$http_fail" -gt 0 ]]; then
-    echo "í ½íº¨ DISPONIBILIDAD: Hubo fallas/degradaciÃ³n HTTP durante el stress (ver 'EVIDENCIA HTTP'). Ãštil para justificar incidentes por carga." | tee -a "$LOG_FILE"
+    echo "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DISPONIBILIDAD: Hubo fallas/degradaciÃ³n HTTP durante el stress (ver 'EVIDENCIA HTTP'). Ãštil para justificar incidentes por carga." | tee -a "$LOG_FILE"
   else
     echo "âœ… DISPONIBILIDAD: No se detectaron fallas HTTP con estos parÃ¡metros. Sube NET_WORKERS o baja timeouts para forzar caÃ­da." | tee -a "$LOG_FILE"
   fi

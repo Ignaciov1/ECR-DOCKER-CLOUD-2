@@ -3,15 +3,16 @@ set -euo pipefail
 
 #############################################
 # RDS MySQL Stress v4.1 (60s total) + Reco
-# Fix: timeout + MYSQL_PWD usando bash -c
+# Fix: Host y Password actualizados para Ignacio
 #############################################
 
-# ===== Configuración (edita aquí) =====
-HOST="database-2.cb2qows604dx.us-east-1.rds.amazonaws.com"
+# ===== Configuración (DATOS ACTUALIZADOS) =====
+HOST="tienda-tech-db.cp2c6g4g0bpf.us-east-1.rds.amazonaws.com"
 PORT=3306
-USER="admin"                   # Cambiar por tu usuario
-PASS="tiendatech1234"          # cambiar por tu password
-DBNAME="tienda_tecnologica"   # base de datos creada en RDS para la app
+USER="admin"
+# Reemplaza 'tu_password_aqui' por la contraseña real que pusiste en Terraform
+PASS="db123456789"          
+DBNAME="tienda_tecnologica"
 
 CURRENT_CLASS="db.t4g.micro"
 TARGET_CLASS="db.t4g.small"
@@ -23,7 +24,7 @@ TOTAL_SECONDS=70
 BASE_CONC=5
 BASE_QUERIES=50
 
-# Opción A: HOG bajo para dejar aire (max_connections=60 -> 55-58)
+# HOG_CONN ajustado para forzar el límite de una db.t4g.micro
 HOG_CONN=55
 
 # STORM
@@ -73,8 +74,6 @@ log "Fecha: $TS"
 log "Endpoint: $HOST:$PORT | DB: $DBNAME"
 log "Instancia actual: $CURRENT_CLASS | Propuesta: $TARGET_CLASS"
 log "TOTAL_SECONDS=$TOTAL_SECONDS"
-log "HOG: conexiones=$HOG_CONN (deja aire)"
-log "STORM: conc=$STORM_CONC | queries=$STORM_QUERIES (por el tiempo restante)"
 log "Log: $LOG"
 log "============================================================"
 log ""
@@ -86,7 +85,7 @@ set -e
 if [[ -n "${MAX_CONN:-}" ]]; then
   log "max_connections (RDS): $MAX_CONN"
 else
-  log "max_connections: (no se pudo leer; seguimos igual)"
+  log "max_connections: (no se pudo leer; verificando conectividad...)"
 fi
 log ""
 
@@ -105,13 +104,13 @@ MYSQL_PWD="$PASS" mysqlslap \
 log ""
 
 #############################################
-# [1] HOG hasta el final
+# [1] HOG: Saturación de conexiones
 #############################################
 HOG_SLEEP_SEC=$((END_EPOCH - $(date +%s)))
 if (( HOG_SLEEP_SEC < 15 )); then HOG_SLEEP_SEC=15; fi
 
 log "[1/3] HOG: abriendo $HOG_CONN conexiones sostenidas por ~${HOG_SLEEP_SEC}s"
-log "TIP: refresca tu app web: deberías ver lentitud/errores intermitentes o que a ratos NO cargan datos."
+log "TIP: intenta cargar la web ahora; debería fallar el listado de productos."
 log ""
 
 set +e
@@ -135,19 +134,18 @@ if echo "$HOG_CHECK_OUT" | grep -qi "too many connections"; then
 elif (( HOG_CHECK_RC != 0 )); then
   log "⚠️ HOG: error de conexión (rc=$HOG_CHECK_RC): $HOG_CHECK_OUT"
 else
-  log "✅ HOG activo (hay aire; aún permite algunas conexiones)."
+  log "✅ HOG activo (aún quedan conexiones libres)."
 fi
 log ""
 
 #############################################
-# [2] STORM por el tiempo restante
+# [2] STORM: Carga de consultas masivas
 #############################################
 NOW_EPOCH="$(date +%s)"
 STORM_WINDOW=$((END_EPOCH - NOW_EPOCH - 3))
 if (( STORM_WINDOW < 10 )); then STORM_WINDOW=10; fi
 
-log "[2/3] STORM: ejecutando mysqlslap por ~${STORM_WINDOW}s (con HOG activo)"
-log "Si mysqlslap falla por conexiones, también cuenta como evidencia."
+log "[2/3] STORM: ejecutando mysqlslap por ~${STORM_WINDOW}s"
 log ""
 
 set +e
@@ -168,7 +166,7 @@ echo "$STORM_OUT" | tee -a "$LOG"
 log ""
 
 #############################################
-# [3] Esperar hasta 60s y soltar HOG
+# [3] Finalización
 #############################################
 NOW_EPOCH="$(date +%s)"
 if (( NOW_EPOCH < END_EPOCH )); then
@@ -178,16 +176,11 @@ fi
 cleanup
 
 #############################################
-# Análisis y Recomendación (robusta)
+# Análisis y Recomendación
 #############################################
 TOO_MANY_CONN="no"
 if echo "${HOG_CHECK_OUT:-}" | grep -qi "too many connections"; then TOO_MANY_CONN="yes"; fi
 if echo "${STORM_OUT:-}" | grep -qi "too many connections"; then TOO_MANY_CONN="yes"; fi
-if (( STORM_RC != 0 )) && echo "${STORM_OUT:-}" | grep -qi "Error when connecting to server"; then TOO_MANY_CONN="yes"; fi
-
-AVG_SEC=$(echo "$STORM_OUT" | awk -F': ' '/Average number of seconds to run all queries/{print $2}' | head -n1 | awk '{print $1}')
-MIN_SEC=$(echo "$STORM_OUT" | awk -F': ' '/Minimum number of seconds to run all queries/{print $2}' | head -n1 | awk '{print $1}')
-MAX_SEC=$(echo "$STORM_OUT" | awk -F': ' '/Maximum number of seconds to run all queries/{print $2}' | head -n1 | awk '{print $1}')
 
 RECO_TITLE=""
 RECO_BODY=""
@@ -196,72 +189,18 @@ if [[ "$TOO_MANY_CONN" == "yes" ]]; then
   RECO_TITLE="❌ HALLAZGO: Saturación de conexiones (Too many connections)"
   RECO_BODY=$(
     cat <<EOF
-Durante ~${TOTAL_SECONDS}s se evidenció saturación/rechazo de conexiones a MySQL.
-Esto puede provocar que la aplicación web quede “arriba” pero SIN cargar datos (el backend no logra abrir/obtener conexiones).
+Se evidenció rechazo de conexiones. El backend no podrá obtener datos del RDS bajo esta carga.
 
-RECOMENDACIÓN PRINCIPAL:
+RECOMENDACIÓN:
 ✅ Escalar verticalmente RDS de $CURRENT_CLASS a $TARGET_CLASS.
-
-ACCIONES COMPLEMENTARIAS:
-1) Revisar/ajustar pool de conexiones del backend (Node): límites, timeouts, reintentos y liberación correcta.
-2) Optimizar queries (índices, evitar N+1, reducir tiempos de transacción).
-3) Revisar en CloudWatch: DatabaseConnections, CPUUtilization, FreeableMemory, Read/WriteLatency.
 EOF
   )
 else
-  RECO_TITLE="⚠️ HALLAZGO: No se detectó saturación explícita de conexiones"
-  RECO_BODY=$(
-    cat <<EOF
-No se detectó “Too many connections” en esta corrida (~${TOTAL_SECONDS}s).
-
-Para hacerlo más visible en la web (max_connections=${MAX_CONN:-N/A}):
-- Sube HOG_CONN a 56-58 (dejando 2-4 conexiones libres)
-- Aumenta STORM_CONC (ej: "120,160,200") o STORM_QUERIES
-EOF
-  )
+  RECO_TITLE="⚠️ HALLAZGO: No se detectó saturación crítica"
+  RECO_BODY="Aumenta el parámetro HOG_CONN en el script para forzar la caída."
 fi
 
-#############################################
-# Reporte MD
-#############################################
-cat > "$REPORT" <<EOF
-# Informe de Stress RDS MySQL (v4.1) y Recomendación
-
-**Fecha:** $TS  
-**Duración total:** ~${TOTAL_SECONDS}s  
-**Endpoint:** $HOST:$PORT  
-**DB:** $DBNAME  
-**Instancia actual:** $CURRENT_CLASS  
-**Instancia propuesta:** $TARGET_CLASS  
-**max_connections:** ${MAX_CONN:-N/A}
-
-## Parámetros
-- HOG: conexiones=$HOG_CONN | duración aprox=${HOG_SLEEP_SEC}s
-- STORM: concurrency=$STORM_CONC | queries=$STORM_QUERIES | ventana aprox=${STORM_WINDOW}s
-
-## Resultados STORM
-- RC: $STORM_RC
-- Average seconds: ${AVG_SEC:-N/A}s
-- Min seconds: ${MIN_SEC:-N/A}s
-- Max seconds: ${MAX_SEC:-N/A}s
-- Detectó Too many connections: $TOO_MANY_CONN
-
-## $RECO_TITLE
-$RECO_BODY
-
-## Archivos
-- Log: \`$LOG\`
-- Reporte: \`$REPORT\`
-EOF
-
-#############################################
-# Mostrar recomendación al final
-#############################################
 log "================ RECOMENDACIÓN FINAL ================"
 log "$RECO_TITLE"
 log "$RECO_BODY"
 log "====================================================="
-log ""
-log "✅ Listo. Revisa:"
-log " - $LOG"
-log " - $REPORT"
