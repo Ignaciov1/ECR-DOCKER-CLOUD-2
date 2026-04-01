@@ -1,0 +1,51 @@
+sudo yum install docker -y
+sudo docker --version
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo systemctl status docker
+sudo usermod -aG docker ec2-user
+sudo newgrp docker
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64   -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version
+pwd
+sudo mkdir tienda-tecnologica
+cd tienda-tecnologica/
+sudo mkdir tienda-tech-db
+sudo mkdir tienda-tech-frontend
+sudo mkdir tienda-tech-backend
+cd tienda-tech-db/
+sudo vim init.sql
+cd ..
+cd tienda-tech-frontend/
+sudo vim Dockerfile
+sudo vim index.html
+sudo vim app.js
+sudo vim nginx.conf
+ls -ltr
+cd ..
+cd tienda-tech-backend/
+sudo vim Dockerfile
+sudo vim package.json
+sudo vim server.js
+ls -ltr
+cd ..
+sudo vim docker-compose.yml
+sudo vim .env
+ls -lta
+sudo yum install telnet -y
+telnet database-2.cb2qows604dx.us-east-1.rds.amazonaws.com 3306
+sudo yum install -y mariadb105
+sudo mysql -h database-2.cb2qows604dx.us-east-1.rds.amazonaws.com -u admin -p < tienda-tech-db/init.sql
+mysql -h database-2.cb2qows604dx.us-east-1.rds.amazonaws.com -u admin -p -e "SHOW DATABASES;"
+mysql -h database-2.cb2qows604dx.us-east-1.rds.amazonaws.com -u admin -p -e "USE tienda_tecnologica; SHOW TABLES; SELECT * FROM productos;"
+cd tienda-tecnologica/
+sudo docker compose up --build -d
+sudo docker ps
+sudo docker logs tienda-tech-backend --tail 50
+sudo docker logs tienda-tech-frontend --tail 50
+docker compose down
+docker compose up -d
+sudo docker ps
+sudo docker exec -it tienda-tech-backend env | egrep "DB_HOST|DB_USER|DB_PASSWORD|DB_NAME|DB_PORT"
