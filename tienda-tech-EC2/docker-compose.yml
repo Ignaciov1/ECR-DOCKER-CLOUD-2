@@ -1,5 +1,6 @@
 services:
   frontend:
+    build: ./tienda-tech-frontend  # <--- AGREGA ESTO
     image: 058264429007.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-frontend:latest
     container_name: tienda-tech-frontend
     ports:
@@ -8,6 +9,7 @@ services:
       - backend
 
   backend:
+    build: ./tienda-tech-backend   # <--- AGREGA ESTO
     image: 058264429007.dkr.ecr.us-east-1.amazonaws.com/tienda-tech-backend:latest
     container_name: tienda-tech-backend
     environment:
@@ -17,4 +19,4 @@ services:
       DB_NAME: "${DB_NAME}"
       DB_PORT: "3306"
     ports:
-      - "3001:3001"
+      - "3001:3001" # O el puerto que hayas decidido dejar en el SG
