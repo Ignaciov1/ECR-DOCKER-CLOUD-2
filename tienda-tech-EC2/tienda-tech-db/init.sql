@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS tienda_tecnologica;
-USE tienda_tecnologica;
+CREATE DATABASE IF NOT EXISTS technovadb;
+USE technovadb;
 
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
